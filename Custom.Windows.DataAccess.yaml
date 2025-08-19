@@ -1,0 +1,481 @@
+name: Custom.Windows.DataAccess
+author: Phalgun Kulkarni
+description: |
+   To be changed:
+
+tools:
+  - name: LECmd
+  - name: JLECmd
+  - name: SBECmd
+  - name: NirsoftBrowsingHistoryView64
+  
+type: CLIENT
+
+parameters:
+  - name: UserAccountRegex
+    description: Regex to only include all events tied to these users
+    type: regex
+    default: .
+    
+  - name: DateAfter
+    type: timestamp
+    description: Search for events after this date. YYYY-MM-DDTmm:hh:ssZ
+    
+  - name: DateBefore
+    type: timestamp
+    description: Search for events before this date. YYYY-MM-DDTmm:hh:ssZ
+
+  - name: UseBuiltInArtifacts
+    type: bool
+    default: Y
+    description: If checked, runs built-in artifacts instead of using third-party tools.
+    
+  - name: RecentDocsMRU
+    type: bool
+    default: N
+    description: If checked, runs Windows.Registry.RecentDocs artifact.  
+  
+  - name: BrowserAccessNirsoft
+    type: bool
+    default: N
+    description: If checked, runs Nirsoft's BrowsingHistoryView. NOTE:The binary is often flagged by EDRs as malicious and may cause alerts.  
+
+precondition: SELECT OS From info() where OS = 'windows'
+
+sources:
+
+  - name: LNK
+    description: Parses the Windows LNK/Shortcut files to extract evidence of data access.
+      
+    query: |
+       LET hostname <= SELECT Hostname
+         FROM info()
+       
+       LET DateAfterTime <= if(condition=DateAfter,
+                               then=timestamp(epoch=DateAfter),
+                               else=timestamp(epoch="1600-01-01"))
+       
+       LET DateBeforeTime <= if(condition=DateBefore,
+                                then=timestamp(epoch=DateBefore),
+                                else=timestamp(epoch="2200-01-01"))
+       
+       LET tmpdir <= tempdir()
+       
+       LET payload <= SELECT OSPath
+         FROM Artifact.Generic.Utils.FetchBinary(ToolName="LECmd", IsExecutable=FALSE)
+       
+       SELECT *
+       FROM if(condition=UseBuiltInArtifacts,
+               then={
+           SELECT SourceFile.Mtime AS EventTime,
+                  split(string=SourceFile.OSPath, sep="\\\\")[2] AS UserAccount,
+                  if(condition=StringData.TargetPath,
+                     then=StringData.TargetPath,
+                     else=LinkTarget.LinkTarget) AS Path,
+                  "TBD" AS FileSize,
+                  "LNK" AS Artifact,
+                  "File_Modification" AS Time_Type,
+                  SourceFile.OSPath AS ArtifactSource,
+                  hostname[0].Hostname AS Host,
+                  ExtraData AS Additional_Info
+           FROM Artifact.Windows.Forensics.Lnk()
+         },
+               else={
+           SELECT *
+           FROM chain(a={
+           SELECT *
+           FROM execve(argv=[payload.OSPath[0], "-d", "C:\\", "--csv",
+                         tmpdir + "lecmd", "--csvf", "results.csv"])
+         },
+                      b={
+           SELECT SourceModified AS EventTime,
+                  split(string=SourceFile, sep="\\\\")[2] AS UserAccount,
+                  if(condition=LocalPath, then=LocalPath, else=RelativePath) AS Path,
+                  FileSize,
+                  "LNK" AS Artifact,
+                  "File_Modification" AS Time_Type,
+                  SourceFile AS ArtifactSource,
+                  hostname[0].Hostname AS Host,
+                  dict(`SourceCreated`=SourceCreated,
+                       `WorkingDirectory`=WorkingDirectory,
+                       `RelativePath`=RelativePath,
+                       `Arguments`=Arguments) AS Additional_Info
+           FROM parse_csv(filename=tmpdir + "lecmd" + "\\results.csv")
+         })
+         })
+       WHERE UserAccount =~ UserAccountRegex
+        AND EventTime > DateAfterTime
+             AND EventTime < DateBeforeTime
+
+    notebook:
+      - type: md
+        template: |
+          # Master Data Access Sheet
+
+      - type: vql # TODO: DO WE KEEP THIS AS A VQL CELL OR A VQL SUGGESTION? IF SUGGESTION THEN THE END USER NEEDS TO ADD IT MANUALLY BUT WOULDNT NEED TO REFRESH
+        name: Master Data Access Workbook
+        template: |
+          SELECT *
+          FROM chain(a={
+            SELECT *
+            FROM source(artifact="Custom.Windows.DataAccess/LNK")
+            LIMIT 50
+          }, b={
+            SELECT *
+            FROM source(artifact="Custom.Windows.DataAccess/Jumplists")
+            LIMIT 50
+          }, c={
+            SELECT *
+            FROM source(artifact="Custom.Windows.DataAccess/Shellbags")
+            LIMIT 50
+          }, d={
+            SELECT *
+            FROM source(artifact="Custom.Windows.DataAccess/Browser Access")
+            LIMIT 50
+          }, e={
+            SELECT *
+            FROM source(artifact="Custom.Windows.DataAccess/WinSCP Remote Path")
+            LIMIT 50
+          })
+      - type: md
+        template: |
+          # Custom.Windows.DataAccess/LNK
+      - type: vql
+        template: |
+          SELECT *
+          FROM source(artifact="Custom.Windows.DataAccess/LNK")
+          LIMIT 50
+
+  - name: Jumplists
+    description: Parses the Windows automaticdestinations and customdestinations files to extract evidence of data access.
+    query: |
+       LET hostname <= SELECT Hostname
+         FROM info()
+       
+       LET DateAfterTime <= if(condition=DateAfter,
+                               then=timestamp(epoch=DateAfter),
+                               else=timestamp(epoch="1600-01-01"))
+       
+       LET DateBeforeTime <= if(condition=DateBefore,
+                                then=timestamp(epoch=DateBefore),
+                                else=timestamp(epoch="2200-01-01"))
+       
+       -- build tempfolder for output
+       LET tmpdir <= tempdir()
+       
+       -- decompress utility
+       LET payload <= SELECT *
+         FROM Artifact.Generic.Utils.FetchBinary(ToolName="JLECmd",
+                                                 IsExecutable=FALSE)
+       
+       LET x = scope()
+       
+       SELECT *
+       FROM if(condition=UseBuiltInArtifacts,
+               then={
+           SELECT WriteTime AS EventTime,
+                  split(string=AutomaticDestinationPath, sep="\\")[2] AS UserAccount,
+                  LinkTarget AS Path,
+                  FileSize,
+                  "Jumplists" AS Artifact,
+                  "File_Modification" AS Time_Type,
+                  AutomaticDestinationPath AS ArtifactSource,
+                  hostname[0].Hostname AS Host,
+                  dict(`Application`=Application,
+                       `ApplicationId`=ApplicationId,
+                       `CreationTime`=CreationTime) AS Additional_Info
+           FROM Artifact.Windows.Forensics.JumpLists()
+         },
+               else={
+           SELECT *
+           FROM chain(a={
+           SELECT *
+           FROM execve(argv=[payload.OSPath[0], "-d", "C:\\", "--fd", "--csv",
+                         tmpdir, "--csvf", "results.csv"])
+         },
+                      b={
+           SELECT *
+           FROM foreach(row={
+           SELECT OSPath
+           FROM glob(globs="results_*.csv", root=tmpdir)
+         },
+                        query={
+           SELECT x.SourceModified AS EventTime,
+                  split(string=x.SourceFile, sep="\\\\")[2] AS UserAccount,
+                  if(condition=x.LocalPath, then=x.LocalPath, else=x.Path) AS Path,
+                  x.FileSize AS FileSize,
+                  "Jumplists" AS Artifact,
+                  "File_Modification" AS Time_Type,
+                  x.SourceFile AS ArtifactSource,
+                  hostname[0].Hostname AS Host,
+                  dict(`x.SourceCreated`=SourceCreated,
+                       `x.AppIdDescription`=AppIdDescription,
+                       `x.TargetIDAbsolutePath`=TargetIDAbsolutePath,
+                       `x.RelativePath`=RelativePath,
+                       `x.Arguments`=Arguments) AS Additional_Info
+           FROM parse_csv(filename=OSPath)
+         })
+         })
+         })
+       WHERE UserAccount =~ UserAccountRegex
+        AND EventTime > DateAfterTime
+             AND EventTime < DateBeforeTime
+
+
+
+  - name: Shellbags
+    description: changeme.
+    query: |
+       LET hostname <= SELECT Hostname
+         FROM info()
+       
+       LET DateAfterTime <= if(condition=DateAfter,
+                               then=timestamp(epoch=DateAfter),
+                               else=timestamp(epoch="1600-01-01"))
+       
+       LET DateBeforeTime <= if(condition=DateBefore,
+                                then=timestamp(epoch=DateBefore),
+                                else=timestamp(epoch="2200-01-01"))
+       
+       -- build tempfolder for output
+       LET tempfolder <= tempdir()
+       
+       LET payload <= SELECT *
+         FROM Artifact.Generic.Utils.FetchBinary(ToolName="SBECmd", IsExecutable=TRUE)
+       
+       -- get users with profiles
+       LET UserProfiles <= SELECT Uid,
+                                  Name,
+                                  Directory,
+                                  UUID,
+                                  Mtime
+         FROM Artifact.Windows.Sys.Users()
+       
+       SELECT *
+       FROM if(condition=UseBuiltInArtifacts,
+               then={
+           SELECT ModTime AS EventTime,
+                  split(string=Hive, sep="\\")[2] AS UserAccount,
+                  Path,
+                  "N/A" AS FileSize,
+                  "Shellbags" AS Artifact,
+                  "Key_Modification" AS Time_Type,
+                  Hive AS ArtifactSource,
+                  hostname[0].Hostname AS Host,
+                  Description AS Additional_Info
+           FROM Artifact.Windows.Forensics.Shellbags()
+         },
+               else={
+           SELECT *
+           FROM chain(a={
+           SELECT *
+           FROM foreach(row=UserProfiles,
+                        query={
+           SELECT *, Name
+           FROM execve(argv=[payload.OSPath[0], "-d", Directory, "--csv",
+                         tempfolder + "\\" + Name, "--dedupe"])
+         })
+         },
+                      b={
+           SELECT *
+           FROM foreach(row={
+           SELECT OSPath
+           FROM glob(globs="**\\Deduplicated.csv", root=tempfolder)
+         },
+                        query={
+           SELECT if(condition=LastInteracted,
+                     then=LastInteracted,
+                     else=LastWriteTime) AS EventTime,
+                  split(string=OSPath, sep="\\\\")[5] AS UserAccount,
+                  AbsolutePath AS Path,
+                  "N/A" AS FileSize,
+                  "Shellbags" AS Artifact,
+                  "Key_Modification" AS Time_Type,
+                  SourceFile AS ArtifactSource,
+                  hostname[0].Hostname AS Host,
+                  dict(`Value`=Value,
+                       `ChildBags`=ChildBags,
+                       `CreatedOn`=CreatedOn,
+                       `ModifiedOn`=ModifiedOn,
+                       `FirstInteracted`=FirstInteracted,
+                       `MRUPosition`=MRUPosition,
+                       `HasExplored`=HasExplored) AS Additional_Info
+           FROM parse_csv(filename=OSPath)
+         })
+         })
+         })
+       WHERE UserAccount =~ UserAccountRegex
+        AND EventTime > DateAfterTime
+             AND EventTime < DateBeforeTime
+
+      
+  - name: Browser Access Nirsoft
+    description: TBA.
+    query: |
+       LET hostname <= SELECT Hostname
+         FROM info()
+       
+       LET DateAfterTime <= if(condition=DateAfter,
+                               then=timestamp(epoch=DateAfter),
+                               else=timestamp(epoch="1600-01-01"))
+       
+       LET DateBeforeTime <= if(condition=DateBefore,
+                                then=timestamp(epoch=DateBefore),
+                                else=timestamp(epoch="2200-01-01"))
+       
+       SELECT *
+       FROM if(condition=BrowserAccessNirsoft,
+               then={
+           SELECT timestamp_format(time=`Visit Time`, format="RFC3339") AS EventTime,
+                  `User Profile` AS UserAccount,
+                  if(condition=URL =~ "file:///",
+                     then=split(string=URL, sep_string="file:///")[1]) AS Path,
+                  'N/A' AS FileSize,
+                  `Web Brower` + "Access" AS Artifact,
+                  `History File` AS ArtifactSource,
+                  hostname[0].Hostname AS Host,
+                  dict(`Visit Count`=`Visit Count`,
+                       `Visit Type`=`Visit Type`,
+                       `Visit Duration`=`Visit Duration`) AS Additional_Info
+           FROM Artifact.Windows.Applications.NirsoftBrowserViewer(PARSE_TZ='GMT')
+         })
+       WHERE UserAccount =~ UserAccountRegex
+        AND EventTime > DateAfterTime
+             AND EventTime < DateBeforeTime
+                  AND Path =~ ".+"
+
+    
+  - name: Browser Access SQLiteHunter
+    description: TBA.
+    query: |
+       LET hostname <= SELECT Hostname
+         FROM info()
+       
+       LET DateAfterTime <= if(condition=DateAfter,
+                               then=timestamp(epoch=DateAfter),
+                               else=timestamp(epoch="1600-01-01"))
+       
+       LET DateBeforeTime <= if(condition=DateBefore,
+                                then=timestamp(epoch=DateBefore),
+                                else=timestamp(epoch="2200-01-01"))
+       
+       LET Chrome <= SELECT
+           VisitTime AS EventTime,
+           split(string=OSPath, sep="\\\\")[2] AS UserAccount,
+           if(condition=URL =~ "file:///",
+              then=split(string=URL, sep_string="file:///")[1]) AS Path,
+           'N/A' AS FileSize,
+           "Chrome Browser access" AS Artifact,
+           OSPath AS ArtifactSource,
+           hostname[0].Hostname AS Host,
+           dict(`VisitCount`=`VisitCount`,
+                `TypedCount`=`TypedCount`,
+                `VisitDurationInSeconds`=`VisitDurationInSeconds`,
+                `Hidden`=`Hidden`) AS Additional_Info
+         FROM Artifact.Generic.Forensic.SQLiteHunter(
+           source='Chromium Browser History_Visits')
+       
+       LET FireFox <= SELECT
+           LastVisitDate AS EventTime,
+           split(string=OSPath, sep="\\\\")[2] AS UserAccount,
+           if(condition=URL =~ "file:///",
+              then=split(string=URL, sep_string="file:///")[1]) AS Path,
+           'N/A' AS FileSize,
+           "FireFox Browser access" AS Artifact,
+           OSPath AS ArtifactSource,
+           hostname[0].Hostname AS Host,
+           dict(`VisitCount`=`VisitCount`,
+                `Title`=`Title`,
+                `Typed`=`Typed`,
+                `Hidden`=`Hidden`) AS Additional_Info
+         FROM Artifact.Generic.Forensic.SQLiteHunter(source='Firefox Places_History')
+       
+       LET Edge <= SELECT
+           `Last Visited Time` AS EventTime,
+           split(string=OSPath, sep="\\\\")[2] AS UserAccount,
+           if(condition=URL =~ "file:///",
+              then=split(string=URL, sep_string="file:///")[1]) AS Path,
+           'N/A' AS FileSize,
+           "Edge Browser access" AS Artifact,
+           OSPath AS ArtifactSource,
+           hostname[0].Hostname AS Host,
+           dict(`VisitCount`=`VisitCount`, `Title`=`Title`) AS Additional_Info
+         FROM Artifact.Generic.Forensic.SQLiteHunter(
+           source='Edge Browser Navigation History_Navigation History')
+       
+       SELECT *
+       FROM chain(a={
+           SELECT *
+           FROM Chrome
+         },
+                  b={
+           SELECT *
+           FROM FireFox
+         },
+                  c={
+           SELECT *
+           FROM Edge
+         })
+       WHERE UserAccount =~ UserAccountRegex
+        AND EventTime > DateAfterTime
+             AND EventTime < DateBeforeTime
+                  AND Path =~ ".+"
+
+  - name: WinSCP Remote Path
+    description: TBA.
+    query: |
+       LET hostname <= SELECT Hostname
+         FROM info()
+       
+       LET DateAfterTime <= if(condition=DateAfter,
+                               then=timestamp(epoch=DateAfter),
+                               else=timestamp(epoch="1600-01-01"))
+       
+       LET DateBeforeTime <= if(condition=DateBefore,
+                                then=timestamp(epoch=DateBefore),
+                                else=timestamp(epoch="2200-01-01"))
+       
+       SELECT Mtime AS EventTime,
+              Username AS UserAccount,
+              regex_replace(source=Data.value, re='%5C', replace='/') AS Path,
+              'N/A' AS FileSize,
+              "WinSCP Remote Path" AS Artifact,
+              OSPath AS ArtifactSource,
+              hostname[0].Hostname AS Host,
+              dict(Directory=`Directory`) AS Additional_Info
+       FROM Artifact.Windows.Registry.NTUser(
+         KeyGlob="Software\\Martin Prikryl\\WinSCP 2\\Configuration\\History\\RemoteTarget\\*")
+       WHERE UserAccount =~ UserAccountRegex
+        AND EventTime > DateAfterTime
+             AND EventTime < DateBeforeTime
+
+  - name: MRU
+    description: TBA.
+    query: |
+       LET hostname <= SELECT Hostname
+         FROM info()
+       
+       LET DateAfterTime <= if(condition=DateAfter,
+                               then=timestamp(epoch=DateAfter),
+                               else=timestamp(epoch="1600-01-01"))
+       
+       LET DateBeforeTime <= if(condition=DateBefore,
+                                then=timestamp(epoch=DateBefore),
+                                else=timestamp(epoch="2200-01-01"))
+       
+       SELECT *
+       FROM if(condition=RecentDocsMRU,
+               then={
+           SELECT LastWriteTime AS EventTime,
+                  Username AS UserAccount,
+                  MruEntries AS Path,
+                  'N/A' AS FileSize,
+                  "MRU" AS Artifact,
+                  HiveName AS ArtifactSource,
+                  hostname[0].Hostname AS Host,
+                  dict(Key=`Key`, UUID=`UUID`) AS Additional_Info
+           FROM Artifact.Windows.Registry.RecentDocs()
+         })
+       WHERE UserAccount =~ UserAccountRegex
+        AND EventTime > DateAfterTime
+             AND EventTime < DateBeforeTime
