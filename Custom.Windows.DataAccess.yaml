@@ -359,13 +359,13 @@ sources:
                                 then=timestamp(epoch=DateBefore),
                                 else=timestamp(epoch="2200-01-01"))
        
-       LET Chrome <= SELECT
+       LET Chromium <= SELECT
            VisitTime AS EventTime,
            split(string=OSPath, sep="\\\\")[2] AS UserAccount,
            if(condition=URL =~ "file:///",
               then=split(string=URL, sep_string="file:///")[1]) AS Path,
            'N/A' AS FileSize,
-           "Chrome Browser access" AS Artifact,
+           "Chromium Browser access" AS Artifact,
            OSPath AS ArtifactSource,
            hostname[0].Hostname AS Host,
            dict(`VisitCount`=`VisitCount`,
@@ -406,7 +406,7 @@ sources:
        SELECT *
        FROM chain(a={
            SELECT *
-           FROM Chrome
+           FROM Chromium
          },
                   b={
            SELECT *
@@ -479,3 +479,4 @@ sources:
        WHERE UserAccount =~ UserAccountRegex
         AND EventTime > DateAfterTime
              AND EventTime < DateBeforeTime
+
