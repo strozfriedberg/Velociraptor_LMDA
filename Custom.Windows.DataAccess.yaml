@@ -1,8 +1,48 @@
 name: Custom.Windows.DataAccess
-author: Phalgun Kulkarni
+author: Phalgun Kulkarni and Kostya Ilioukevitch
 description: |
-   To be changed:
+   This artifact combines a variety of data access artifacts and provides normalized results that can be used for data access report generation.
+   It also enhances investigations by saving the time used to normalize and filter useful information from multiple sources.
 
+   The following data access sources are included within the artifact:
+   
+    - `LNK` (shortcut) files
+    - `Jumplists`
+    - `Shellbags`
+    - `MRU` (Most Recently Used files and directories)
+    - `Local files` accessed via Browsers
+    - `WinScp Registry Key` consisting of paths traversed
+  
+  
+   We provide two options for parsing LNK, JumpLists, ShellBags, and Browsers:
+    
+    - Using `built-in` artifacts
+    - Using `third-party` tools
+   
+   We use built-in artifacts by default but if you wish to use third-party tools, please note the following:
+   
+    - For `LNK`, `JumpLists`, and `Shellbags`, we are using Zimmerman tools (LECmd, JLECmd, and SBECmd respectively), we recommended that you upload `.NET version 4` binaries in the tools section to avoid potential issues regarding unavailablity of .NET version 6 or 9 on endpoints.
+   
+    - For `Browsers`, we are using Nirsoft's BrowsingHistoryView64, which is often tagged as **`MALWARE`** by Endpoint Detection and Response tools - `this may cause alerts`.
+    
+    - Please upload tools **(.exe and not .zip files)** and set the setting to serve locally to avoid issues regarding internet access.
+   
+   We have **disabled** `MRU` parsing by default as it often contains duplicate data.
+   
+   Artifacts used as inspiration or wrapper:
+   
+   - Windows.Forensics.Lnk
+   - Windows.Applications.LECmd
+   - Windows.Forensics.JumpLists
+   - Windows.Applications.JLECmd
+   - Windows.Forensics.Shellbags
+   - Windows.Applications.SBECmd
+   - Windows.Applications.NirsoftBrowserViewer
+   - Generic.Forensic.SQLiteHunter
+   - Windows.Registry.NTUser
+   - Windows.Registry.RecentDocs
+   
+   
 tools:
   - name: LECmd
   - name: JLECmd
@@ -13,7 +53,7 @@ type: CLIENT
 
 parameters:
   - name: UserAccountRegex
-    description: Regex to only include all events tied to these users
+    description: Regex to only include events tied to specific users
     type: regex
     default: .
     
@@ -28,24 +68,24 @@ parameters:
   - name: UseBuiltInArtifacts
     type: bool
     default: Y
-    description: If checked, runs built-in artifacts instead of using third-party tools.
+    description: Checked by default, runs built-in artifacts instead of using third-party tools
     
   - name: RecentDocsMRU
     type: bool
     default: N
-    description: If checked, runs Windows.Registry.RecentDocs artifact.  
+    description: If checked, runs Windows.Registry.RecentDocs artifact
   
   - name: BrowserAccessNirsoft
     type: bool
     default: N
-    description: If checked, runs Nirsoft's BrowsingHistoryView. NOTE:The binary is often flagged by EDRs as malicious and may cause alerts.  
+    description: If checked, runs Nirsoft's BrowsingHistoryView. **NOTE - The binary is often flagged by EDRs as `malicious` and may cause alerts**  
 
 precondition: SELECT OS From info() where OS = 'windows'
 
 sources:
 
   - name: LNK
-    description: Parses the Windows LNK/Shortcut files to extract evidence of data access.
+    description: Parses Windows LNK or Shortcut files to extract evidence of data access.
       
     query: |
        LET hostname <= SELECT Hostname
@@ -112,7 +152,7 @@ sources:
         template: |
           # Master Data Access Sheet
 
-      - type: vql # TODO: DO WE KEEP THIS AS A VQL CELL OR A VQL SUGGESTION? IF SUGGESTION THEN THE END USER NEEDS TO ADD IT MANUALLY BUT WOULDNT NEED TO REFRESH
+      - type: vql
         name: Master Data Access Workbook
         template: |
           SELECT *
@@ -130,11 +170,19 @@ sources:
             LIMIT 50
           }, d={
             SELECT *
-            FROM source(artifact="Custom.Windows.DataAccess/Browser Access")
+            FROM source(artifact="Custom.Windows.DataAccess/Browser Access Nirsoft")
             LIMIT 50
           }, e={
             SELECT *
+            FROM source(artifact="Custom.Windows.DataAccess/Browser Access SQLiteHunter")
+            LIMIT 50
+          }, f={
+            SELECT *
             FROM source(artifact="Custom.Windows.DataAccess/WinSCP Remote Path")
+            LIMIT 50
+          }, g={
+            SELECT *
+            FROM source(artifact="Custom.Windows.DataAccess/MRU")
             LIMIT 50
           })
       - type: md
@@ -147,7 +195,7 @@ sources:
           LIMIT 50
 
   - name: Jumplists
-    description: Parses the Windows automaticdestinations and customdestinations files to extract evidence of data access.
+    description: Parses Windows Jumpliists or automaticdestinations and customdestinations `(only with JLECmd)` files to extract evidence of data access.
     query: |
        LET hostname <= SELECT Hostname
          FROM info()
@@ -222,9 +270,8 @@ sources:
              AND EventTime < DateBeforeTime
 
 
-
   - name: Shellbags
-    description: changeme.
+    description: Parses Windows Shellbags to extract evidence of data access.
     query: |
        LET hostname <= SELECT Hostname
          FROM info()
@@ -310,7 +357,7 @@ sources:
 
       
   - name: Browser Access Nirsoft
-    description: TBA.
+    description: Parses Windows Browsers to extract evidence of local data access via Nirsoft's NirsoftBrowserViewer.
     query: |
        LET hostname <= SELECT Hostname
          FROM info()
@@ -346,7 +393,7 @@ sources:
 
     
   - name: Browser Access SQLiteHunter
-    description: TBA.
+    description: Parses Windows Browsers to extract evidence of local data access.
     query: |
        LET hostname <= SELECT Hostname
          FROM info()
@@ -422,7 +469,7 @@ sources:
                   AND Path =~ ".+"
 
   - name: WinSCP Remote Path
-    description: TBA.
+    description: Parses WinScp RemoteTarget registry key to extract evidence of data access.
     query: |
        LET hostname <= SELECT Hostname
          FROM info()
@@ -450,7 +497,7 @@ sources:
              AND EventTime < DateBeforeTime
 
   - name: MRU
-    description: TBA.
+    description: Parses RecentDocs registry keys to extract evidence of data access.
     query: |
        LET hostname <= SELECT Hostname
          FROM info()
@@ -479,4 +526,3 @@ sources:
        WHERE UserAccount =~ UserAccountRegex
         AND EventTime > DateAfterTime
              AND EventTime < DateBeforeTime
-
