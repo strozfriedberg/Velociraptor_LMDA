@@ -222,12 +222,12 @@ sources:
        FROM if(condition=UseBuiltInArtifacts,
                then={
            SELECT WriteTime AS EventTime,
-                  split(string=AutomaticDestinationPath, sep="\\")[2] AS UserAccount,
+                  split(string=AutomaticDestinationsPath, sep="\\\\")[2] AS UserAccount,
                   LinkTarget AS Path,
                   FileSize,
                   "Jumplists" AS Artifact,
                   "File_Modification" AS Time_Type,
-                  AutomaticDestinationPath AS ArtifactSource,
+                  AutomaticDestinationsPath AS ArtifactSource,
                   hostname[0].Hostname AS Host,
                   dict(`Application`=Application,
                        `ApplicationId`=ApplicationId,
@@ -302,7 +302,7 @@ sources:
        FROM if(condition=UseBuiltInArtifacts,
                then={
            SELECT ModTime AS EventTime,
-                  split(string=Hive, sep="\\")[2] AS UserAccount,
+                  split(string=Hive, sep="\\\\")[2] AS UserAccount,
                   Path,
                   "N/A" AS FileSize,
                   "Shellbags" AS Artifact,
@@ -526,3 +526,4 @@ sources:
        WHERE UserAccount =~ UserAccountRegex
         AND EventTime > DateAfterTime
              AND EventTime < DateBeforeTime
+
