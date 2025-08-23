@@ -172,7 +172,7 @@ sources:
       LET EIDLookup <= dict(
         `4624` = 'ACCOUNT_LOGGED_ON',
         `4625` = 'ACCOUNT_LOGON_FAILURE',
-        `4634` = 'ACCOUNT_LOGOFF'
+        `4634` = 'ACCOUNT_LOGOFF',
         `4648` = 'LOGON_ATTEMPT_EXPLICIT_CREDENTIALS',
         `4672` = 'PRIVILEGED_LOGON',
         `4776` = 'CREDENTIAL_VALIDATION_ATTEMPTED',
@@ -280,7 +280,7 @@ sources:
                                                   then= dict(`EventID` = EventID,
                                                              `Status` = EventData.Status,
                                                              `Interactive` = "Both",
-                                                             `ConfidenceLevel` = "Strong"))))))))
+                                                             `ConfidenceLevel` = "Strong"))))))))))
 
       LET DateAfterTime <= if(condition=DateAfter,
         then=timestamp(epoch=DateAfter), else=timestamp(epoch="1600-01-01"))
