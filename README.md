@@ -32,7 +32,7 @@ The DA artifact compiles user activity data to build structured timelines for da
 
 ### Features:
 - Combines data from various artifacts in a normalized format
-- Results are catered toward Excel reporting tempate used for stakeholders communication
+- Results are catered toward Excel reporting tempate used for stakeholder communication
 - Highlights sensitive file interactions
 
 ---
