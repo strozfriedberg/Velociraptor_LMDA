@@ -16,8 +16,6 @@ description: |
 
     - Elastic.Flows.Upload
 
-  © 2023 Aon plc
-
 type: SERVER_EVENT
 
 parameters:
