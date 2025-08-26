@@ -49,9 +49,3 @@ An Excel-based reporting template is included to simplify stakeholder communicat
 ## Copyright
 
 Copyright 2025, LevelBlue. LMDA is licensed under the Apache License, Version 2.0.
-
-
----
-
-## 📜 License
-This project is licensed under the MIT License.
