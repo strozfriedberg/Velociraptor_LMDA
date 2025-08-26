@@ -8,7 +8,7 @@ These artifacts streamline analysis by aggregating key forensic data from multip
 
 ---
 
-## 🚧 Challenges during enumerating Lateral Movement and Data Access
+## 🚧 Challenges faced while investigating Lateral Movement and Data Access
 - Manual and time-consuming analysis
 - Limited insights from Windows Event Logs
 - Fragmented forensic data sources
@@ -32,7 +32,7 @@ The DA artifact compiles user activity data to build structured timelines for da
 
 ### Features:
 - Combines data from various artifacts in a normalized format
-- Results are catered toward Excel reporting tempate used for client communications
+- Results are catered toward Excel reporting tempate used for stakeholders communication
 - Highlights sensitive file interactions
 
 ---
@@ -48,4 +48,4 @@ An Excel-based reporting template is included to simplify stakeholder communicat
 
 ## Copyright
 
-Copyright 2025, LevelBlue. LMDA is licensed under the Apache License, Version 2.0.
+Copyright 2025, Stroz Friedberg, A LevelBlue Company. LMDA is licensed under the Apache License, Version 2.0.
