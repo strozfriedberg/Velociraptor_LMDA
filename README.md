@@ -27,7 +27,7 @@ The LM artifact aggregates and categorizes accesses to identify lateral movement
 
 ---
 
-## 📂 DA Artifact: Data Access & Exfiltration Analysis
+## 📂 DA Artifact
 The DA artifact compiles user activity data to build structured timelines for data access and potential exfiltration.
 
 ### Features:
