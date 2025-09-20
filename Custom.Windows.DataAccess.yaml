@@ -284,7 +284,7 @@ sources:
                then={
            SELECT ModTime AS EventTime,
                   split(string=Hive, sep="\\\\")[2] AS UserAccount,
-                  Path,
+                  regex_replace(source=FullPath, replace="\\", re=" -> ") AS Path,
                   "N/A" AS FileSize,
                   "Shellbags" AS Artifact,
                   "Key_Modification" AS Time_Type,
@@ -498,3 +498,4 @@ sources:
        WHERE UserAccount =~ UserAccountRegex
         AND EventTime > DateAfterTime
              AND EventTime < DateBeforeTime
+
