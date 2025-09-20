@@ -81,7 +81,7 @@ description: |
    - Windows.Registry.NTUser
    - Windows.Applications.TeamViewer.Incoming [Matt Green - @mgreen27]
    - Windows.Timeline.Registry.RunMRU [Matt Green - @mgreen27]
-   - Exchange.Windows.Applications.AnyDesk [Jos Clephas - @DfirJos]
+   - Windows.Applications.AnyDesk [Jos Clephas - @DfirJos]
 
 type: CLIENT
 
@@ -1217,7 +1217,7 @@ sources:
                     `Logs source system` = hostname[0].Hostname,
                     `Interactive` = "Yes",
                     `ConfidenceLevel` = "Strong") AS AddInfo
-        FROM Artifact.Exchange.Windows.Applications.AnyDesk()
+        FROM Artifact.Windows.Applications.AnyDesk()
         WHERE UserAccount =~ UserAccountRegex
           AND EventTime > DateAfterTime
           AND EventTime < DateBeforeTime
