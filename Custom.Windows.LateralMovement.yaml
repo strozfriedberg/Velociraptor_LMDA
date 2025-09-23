@@ -4,6 +4,8 @@ description: |
    This artifact combines a plethora of lateral movement artifacts and provides normalized results.
    It also enhances investigations by saving the time used to find artifacts and filter useful information from multiple output formats.
 
+   Please note: Execute `Server.Import.ArtifactExchange` and `Server.Import.Extras` in Servers Artifact before importing/creating this artifact.
+   
    The following lateral movement sources are included within the artifact:
 
    - Security Event Logs
