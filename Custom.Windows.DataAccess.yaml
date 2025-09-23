@@ -3,7 +3,9 @@ author: Phalgun Kulkarni and Kostya Ilioukevitch
 description: |
    This artifact combines a variety of data access artifacts and provides normalized results that can be used for data access report generation.
    It also enhances investigations by saving the time used to normalize and filter useful information from multiple sources.
-
+   
+   Please note: Execute `Server.Import.ArtifactExchange` and `Server.Import.Extras` in Servers Artifact before importing/creating this artifact.
+   
    The following data access sources are included within the artifact:
    
     - `LNK` (shortcut) files
@@ -498,4 +500,5 @@ sources:
        WHERE UserAccount =~ UserAccountRegex
         AND EventTime > DateAfterTime
              AND EventTime < DateBeforeTime
+
 
