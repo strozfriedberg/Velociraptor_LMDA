@@ -107,6 +107,7 @@ sources:
        FROM if(condition=UseBuiltInArtifacts,
                then={
            SELECT SourceFile.Mtime AS EventTime,
+                  hostname[0].Hostname AS Host,
                   split(string=SourceFile.OSPath, sep="\\\\")[2] AS UserAccount,
                   if(condition=StringData.TargetPath,
                      then=StringData.TargetPath,
@@ -115,7 +116,7 @@ sources:
                   "LNK" AS Artifact,
                   "File_Modification" AS Time_Type,
                   SourceFile.OSPath AS ArtifactSource,
-                  hostname[0].Hostname AS Host,
+                  
                   ExtraData AS Additional_Info
            FROM Artifact.Windows.Forensics.Lnk()
          },
@@ -127,13 +128,13 @@ sources:
                          tmpdir + "lecmd", "--csvf", "results.csv"])
                         })},
                       b={SELECT SourceModified AS EventTime,
+                         hostname[0].Hostname AS Host,
                          split(string=SourceFile, sep="\\\\")[2] AS UserAccount,
                          if(condition=LocalPath, then=LocalPath, else=RelativePath) AS Path,
                          FileSize,
                          "LNK" AS Artifact,
                          "File_Modification" AS Time_Type,
                          SourceFile AS ArtifactSource,
-                         hostname[0].Hostname AS Host,
                          dict(`SourceCreated`=SourceCreated,
                               `WorkingDirectory`=WorkingDirectory,
                               `RelativePath`=RelativePath,
@@ -214,13 +215,13 @@ sources:
        FROM if(condition=UseBuiltInArtifacts,
                then={
            SELECT WriteTime AS EventTime,
+                  hostname[0].Hostname AS Host,
                   split(string=AutomaticDestinationsPath, sep="\\\\")[2] AS UserAccount,
                   LinkTarget AS Path,
                   FileSize,
                   "Jumplists" AS Artifact,
                   "File_Modification" AS Time_Type,
                   AutomaticDestinationsPath AS ArtifactSource,
-                  hostname[0].Hostname AS Host,
                   dict(`Application`=Application,
                        `ApplicationId`=ApplicationId,
                        `CreationTime`=CreationTime) AS Additional_Info
@@ -236,13 +237,13 @@ sources:
                       b={SELECT * FROM foreach(row={SELECT OSPath FROM glob(globs="results_*.csv", root=tmpdir)
                      },
                         query={SELECT x.SourceModified AS EventTime,
+                               hostname[0].Hostname AS Host,
                                split(string=x.SourceFile, sep="\\\\")[2] AS UserAccount,
                                if(condition=x.LocalPath, then=x.LocalPath, else=x.Path) AS Path,
                                x.FileSize AS FileSize,
                                "Jumplists" AS Artifact,
                                "File_Modification" AS Time_Type,
                                x.SourceFile AS ArtifactSource,
-                               hostname[0].Hostname AS Host,
                                dict(`x.SourceCreated`=SourceCreated,
                                     `x.AppIdDescription`=AppIdDescription,
                                     `x.TargetIDAbsolutePath`=TargetIDAbsolutePath,
@@ -285,13 +286,13 @@ sources:
        FROM if(condition=UseBuiltInArtifacts,
                then={
            SELECT ModTime AS EventTime,
+                  hostname[0].Hostname AS Host,
                   split(string=Hive, sep="\\\\")[2] AS UserAccount,
                   regex_replace(source=FullPath, replace="\\", re=" -> ") AS Path,
                   "N/A" AS FileSize,
                   "Shellbags" AS Artifact,
                   "Key_Modification" AS Time_Type,
                   Hive AS ArtifactSource,
-                  hostname[0].Hostname AS Host,
                   Description AS Additional_Info
            FROM Artifact.Windows.Forensics.Shellbags()
          },
@@ -307,13 +308,13 @@ sources:
                         query={SELECT if(condition=LastInteracted,
                                       then=LastInteracted,
                                       else=LastWriteTime) AS EventTime,
+                                      hostname[0].Hostname AS Host,
                                       split(string=OSPath, sep="\\\\")[5] AS UserAccount,
                                       AbsolutePath AS Path,
                                       "N/A" AS FileSize,
                                       "Shellbags" AS Artifact,
                                       "Key_Modification" AS Time_Type,
                                       SourceFile AS ArtifactSource,
-                                      hostname[0].Hostname AS Host,
                                       dict(`Value`=Value,
                                            `ChildBags`=ChildBags,
                                            `CreatedOn`=CreatedOn,
@@ -348,13 +349,14 @@ sources:
        FROM if(condition=BrowserAccessNirsoft,
                then={
            SELECT timestamp_format(time=`Visit Time`, format="RFC3339") AS EventTime,
+                  hostname[0].Hostname AS Host,
                   `User Profile` AS UserAccount,
                   if(condition=URL =~ "file:///",
                      then=split(string=URL, sep_string="file:///")[1]) AS Path,
                   'N/A' AS FileSize,
                   `Web Brower` + "Access" AS Artifact,
+                  "Visit Time" AS Time_Type,
                   `History File` AS ArtifactSource,
-                  hostname[0].Hostname AS Host,
                   dict(`Visit Count`=`Visit Count`,
                        `Visit Type`=`Visit Type`,
                        `Visit Duration`=`Visit Duration`) AS Additional_Info
@@ -382,13 +384,14 @@ sources:
        
        LET Chromium <= SELECT
            VisitTime AS EventTime,
+           hostname[0].Hostname AS Host,
            split(string=OSPath, sep="\\\\")[2] AS UserAccount,
            if(condition=URL =~ "file:///",
               then=split(string=URL, sep_string="file:///")[1]) AS Path,
            'N/A' AS FileSize,
            "Chromium Browser access" AS Artifact,
+           "Visit Time" AS Time_Type,
            OSPath AS ArtifactSource,
-           hostname[0].Hostname AS Host,
            dict(`VisitCount`=`VisitCount`,
                 `TypedCount`=`TypedCount`,
                 `VisitDurationInSeconds`=`VisitDurationInSeconds`,
@@ -398,13 +401,14 @@ sources:
        
        LET FireFox <= SELECT
            LastVisitDate AS EventTime,
+           hostname[0].Hostname AS Host,
            split(string=OSPath, sep="\\\\")[2] AS UserAccount,
            if(condition=URL =~ "file:///",
               then=split(string=URL, sep_string="file:///")[1]) AS Path,
            'N/A' AS FileSize,
            "FireFox Browser access" AS Artifact,
+           "Visit Time" AS Time_Type,
            OSPath AS ArtifactSource,
-           hostname[0].Hostname AS Host,
            dict(`VisitCount`=`VisitCount`,
                 `Title`=`Title`,
                 `Typed`=`Typed`,
@@ -413,13 +417,14 @@ sources:
        
        LET Edge <= SELECT
            `Last Visited Time` AS EventTime,
+           hostname[0].Hostname AS Host,
            split(string=OSPath, sep="\\\\")[2] AS UserAccount,
            if(condition=URL =~ "file:///",
               then=split(string=URL, sep_string="file:///")[1]) AS Path,
            'N/A' AS FileSize,
            "Edge Browser access" AS Artifact,
+           "Visit Time" AS Time_Type,
            OSPath AS ArtifactSource,
-           hostname[0].Hostname AS Host,
            dict(`VisitCount`=`VisitCount`, `Title`=`Title`) AS Additional_Info
          FROM Artifact.Generic.Forensic.SQLiteHunter(
            source='Edge Browser Navigation History_Navigation History')
@@ -457,12 +462,13 @@ sources:
                                 else=timestamp(epoch="2200-01-01"))
        
        SELECT Mtime AS EventTime,
+              hostname[0].Hostname AS Host,
               Username AS UserAccount,
               regex_replace(source=Data.value, re='%5C', replace='/') AS Path,
               'N/A' AS FileSize,
               "WinSCP Remote Path" AS Artifact,
+              "Key_Modification" AS Time_Type,
               OSPath AS ArtifactSource,
-              hostname[0].Hostname AS Host,
               dict(Directory=`Directory`) AS Additional_Info
        FROM Artifact.Windows.Registry.NTUser(
          KeyGlob="Software\\Martin Prikryl\\WinSCP 2\\Configuration\\History\\RemoteTarget\\*")
@@ -488,17 +494,16 @@ sources:
        FROM if(condition=RecentDocsMRU,
                then={
            SELECT LastWriteTime AS EventTime,
+                  hostname[0].Hostname AS Host,
                   Username AS UserAccount,
                   MruEntries AS Path,
                   'N/A' AS FileSize,
                   "MRU" AS Artifact,
+                  "Key_Modification" AS Time_Type,
                   HiveName AS ArtifactSource,
-                  hostname[0].Hostname AS Host,
                   dict(Key=`Key`, UUID=`UUID`) AS Additional_Info
            FROM Artifact.Windows.Registry.RecentDocs()
          })
        WHERE UserAccount =~ UserAccountRegex
         AND EventTime > DateAfterTime
              AND EventTime < DateBeforeTime
-
-
